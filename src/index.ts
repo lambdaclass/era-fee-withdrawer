@@ -110,8 +110,19 @@ async function withdrawForL1TopUps(wallet: zkweb3.Wallet, baseToken: BaseTokenIn
     console.log(`amount: ${ethers.utils.formatEther(amount)}`);
     const bridge = (await wallet.provider.getDefaultBridgeAddresses()).sharedL1;
     // Estimate withdrawal fee.
+    // zksync-ethers/src/provider.ts
+    // The undefined is because the withdraw tx uses the token parameter to get the L2_ETH_TOKEN_ADDRESS
+    // With undefined it defaults to L2_BASE_TOKEN_ADDRESS:
+    //  if (!tx.token) {
+    //      tx.token = L2_BASE_TOKEN_ADDRESS;
+    //    } else if (
+    //      isAddressEq(tx.token, LEGACY_ETH_ADDRESS) ||
+    //      isAddressEq(tx.token, ETH_ADDRESS_IN_CONTRACTS)
+    //    ) {
+    //      tx.token = await this.l2TokenAddress(tx.token);
+    //    }
     const tx = await wallet.provider.getWithdrawTx({
-        token: baseToken.BT_ADDRESS,
+        token: undefined,
         amount,
         from: wallet.address,
         to: wallet.address,
@@ -124,7 +135,7 @@ async function withdrawForL1TopUps(wallet: zkweb3.Wallet, baseToken: BaseTokenIn
         amount = amount.sub(fee);
         // Send withdrawal tx.
         const withdrawHandle = await wallet.withdraw({
-            token: baseToken.BT_ADDRESS,
+            token: undefined,
             amount,
             to: wallet.address,
             overrides: {
@@ -140,18 +151,6 @@ async function withdrawForL1TopUps(wallet: zkweb3.Wallet, baseToken: BaseTokenIn
 
         await withdrawHandle.wait();
         console.log(`Withdrawal L2 tx has succeeded here, tx hash: ${hash}`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        
-        const signer = new zkweb3.L1VoidSigner(
-            zkweb3.utils.L2_BASE_TOKEN_ADDRESS,
-            wallet.providerL1,
-            wallet.provider,
-        ) as unknown as zkweb3.L1Signer;
-
-
-        console.log(`isWithdrawalFinalized: ${await signer.finalizeWithdrawal(hash)}`);
-        await signer.finalizeWithdrawalParams(hash);
-        console.log(`Withdrawal Suceeded`);
     } else {
         console.log('Skipping withdrawing, fee slippage is too big');
     }
@@ -361,6 +360,8 @@ async function sendETH(ethWallet: ethers.Wallet, to: string, amount: BigNumber) 
             fee account l1 balance in this case will be ${ethers.utils.formatEther(l1feeAccountBalance)} ETH`
         );
 
+        // Some ETH has to be sent to the withdrawal address 
+        // Or a swap between the basetoken if it is an ERC20 and ETH has to be performed
         console.log('Step 4 - send ETH to operator');
         await sendETH(ethWallet, OPERATOR_ADDRESS, transferAmount);
 
