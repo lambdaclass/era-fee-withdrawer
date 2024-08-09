@@ -151,6 +151,13 @@ async function withdrawForL1TopUps(wallet: zkweb3.Wallet, baseToken: BaseTokenIn
 
         await withdrawHandle.wait();
         console.log(`Withdrawal L2 tx has succeeded here, tx hash: ${hash}`);
+        // Tokens cannot be claimed with finalizeWithdrawal
+        // If the basetoken is ETH, the tokens are claimed automatically
+        // With an ERC20 as basetoken:
+        // Failed to proceed with fee withdrawal:  Error: Log proof not found!
+        // at Wallet.finalizeWithdrawalParams
+        // at Wallet.finalizeWithdrawal
+        //await wallet.finalizeWithdrawal(hash);
     } else {
         console.log('Skipping withdrawing, fee slippage is too big');
     }
